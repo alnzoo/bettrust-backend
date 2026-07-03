@@ -6,7 +6,8 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-  origin: [ "https://bettrust-app.netlify.app",
+  origin: [
+    "https://bettrust-app.netlify.app",
     "https://prono-betwise.netlify.app",
     "http://localhost:3000",
     "http://localhost:5173",
@@ -32,7 +33,11 @@ app.post("/api/analyze", async (req, res) => {
     if (useWebSearch) body.tools = [{ type: "web_search_20250305", name: "web_search" }];
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
       body: JSON.stringify(body),
     });
     const data = await response.json();
@@ -45,29 +50,31 @@ app.post("/api/analyze", async (req, res) => {
 });
 
 app.post("/api/create-checkout-session", async (req, res) => {
-  const { email, priceAmount, currency = "eur", interval = "month", trialDays = 4 } = req.body;
-  if (!email || !priceAmount) return res.status(400).json({ error: "email et priceAmount sont requis" });
+  const { email, interval = "month", trialDays = 4 } = req.body;
+  if (!email) return res.status(400).json({ error: "email est requis" });
+  const PRICE_IDS = {
+    month: "price_1TpF3nAxeR2E4XmUzFMC7iEQ",
+    year:  "price_1TpF3nAxeR2E4XmUzFMC7iEQ",
+  };
+  const priceId = PRICE_IDS[interval] || PRICE_IDS.month;
   try {
     const stripe = require("stripe")(STRIPE_SECRET_KEY);
     const customers = await stripe.customers.list({ email, limit: 1 });
-    const customer = customers.data.length > 0 ? customers.data[0] : await stripe.customers.create({ email });
-    const price = await stripe.prices.create({
-      currency,
-      unit_amount: Math.round(priceAmount * 100),
-      recurring: { interval },
-      product_data: { name: interval === "year" ? "BetTrust — Abonnement annuel" : "BetTrust — Abonnement mensuel" },
-    });
+    const customer = customers.data.length > 0
+      ? customers.data[0]
+      : await stripe.customers.create({ email });
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ["card"],
-      line_items: [{ price: price.id, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       subscription_data: { trial_period_days: trialDays },
-      success_url: "https://prono-betwise.netlify.app?payment=success",
-      cancel_url: "https://prono-betwise.netlify.app?payment=cancelled",
+      success_url: "https://bettrust-app.netlify.app?payment=success",
+      cancel_url:  "https://bettrust-app.netlify.app?payment=cancelled",
     });
     res.json({ ok: true, url: session.url });
   } catch (err) {
+    console.error("Stripe error:", err);
     res.status(500).json({ error: "Erreur Stripe" });
   }
 });
