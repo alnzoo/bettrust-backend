@@ -1,0 +1,98 @@
+const express = require("express");
+const cors = require("cors");
+const fetch = require("node-fetch");
+
+const app = express();
+app.use(express.json());
+
+app.use(cors({
+  origin: [
+    "https://prono-betwise.netlify.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+  ],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const ODDS_API_KEY      = process.env.ODDS_API_KEY;
+const PORT              = process.env.PORT || 3001;
+
+app.get("/", (req, res) => {
+  res.json({ status: "BetTrust API OK", version: "1.0.0" });
+});
+
+app.post("/api/analyze", async (req, res) => {
+  const { messages, system, max_tokens = 1500, useWebSearch = true } = req.body;
+  if (!messages || !system) return res.status(400).json({ error: "messages et system sont requis" });
+  try {
+    const body = { model: "claude-sonnet-4-6", max_tokens, system, messages };
+    if (useWebSearch) body.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || "Erreur Anthropic" });
+    const text = data.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+    res.json({ text });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/api/create-checkout-session", async (req, res) => {
+  const { email, priceAmount, currency = "eur", interval = "month", trialDays = 4 } = req.body;
+  if (!email || !priceAmount) return res.status(400).json({ error: "email et priceAmount sont requis" });
+  try {
+    const stripe = require("stripe")(STRIPE_SECRET_KEY);
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    const customer = customers.data.length > 0 ? customers.data[0] : await stripe.customers.create({ email });
+    const price = await stripe.prices.create({
+      currency,
+      unit_amount: Math.round(priceAmount * 100),
+      recurring: { interval },
+      product_data: { name: interval === "year" ? "BetTrust — Abonnement annuel" : "BetTrust — Abonnement mensuel" },
+    });
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ["card"],
+      line_items: [{ price: price.id, quantity: 1 }],
+      mode: "subscription",
+      subscription_data: { trial_period_days: trialDays },
+      success_url: "https://prono-betwise.netlify.app?payment=success",
+      cancel_url: "https://prono-betwise.netlify.app?payment=cancelled",
+    });
+    res.json({ ok: true, url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur Stripe" });
+  }
+});
+
+app.get("/api/odds/:sport", async (req, res) => {
+  const { sport } = req.params;
+  const SPORT_KEYS = {
+    tennis: "tennis_atp_wimbledon,tennis_wta_wimbledon,tennis_atp_french_open",
+    football: "soccer_france_ligue_one,soccer_spain_la_liga,soccer_epl,soccer_germany_bundesliga",
+  };
+  const keys = SPORT_KEYS[sport];
+  if (!keys) return res.status(400).json({ error: "Sport non supporte" });
+  try {
+    const results = [];
+    for (const key of keys.split(",")) {
+      const url = `https://api.the-odds-api.com/v4/sports/${key}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`;
+      const response = await fetch(url);
+      if (response.ok) results.push(...await response.json());
+    }
+    res.json({ matches: results, count: results.length });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur Odds API" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("BetTrust API OK sur port " + PORT);
+});
