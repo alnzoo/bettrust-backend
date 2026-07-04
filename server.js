@@ -96,7 +96,8 @@ app.post("/api/create-checkout-session", async (req, res) => {
   // Price IDs fixes créés dans le dashboard Stripe
   const PRICE_IDS = {
     month: "price_1TpF3nAxeR2E4XmUzFMC7iEQ", // 24,90€/mois
-    year:  "price_1TpF3nAxeR2E4XmUzFMC7iEQ",  // remplacer par price_id annuel quand créé
+        year:  "price_1TpKCPAxeR2E4XmUvXoChDm0",
+
   };
 
   const priceId = PRICE_IDS[interval] || PRICE_IDS.month;
