@@ -9,6 +9,7 @@ app.use(cors({
   origin: [
     "https://bettrust.fr",
     "https://www.bettrust.fr",
+    "https://bettrust-app.vercel.app",
     "https://bettrust-app.netlify.app",
     "http://localhost:3000",
     "http://localhost:5173",
@@ -22,12 +23,10 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const ODDS_API_KEY = process.env.ODDS_API_KEY;
 const PORT = process.env.PORT || 3001;
 
-// Health check — réveille le serveur quand l'app s'ouvre
 app.get("/", (req, res) => {
   res.json({ status: "BetTrust API OK", version: "1.0.0" });
 });
 
-// Analyse IA via Anthropic
 app.post("/api/analyze", async (req, res) => {
   const { messages, system, max_tokens = 1500, useWebSearch = true } = req.body;
   if (!messages || !system) return res.status(400).json({ error: "messages et system sont requis" });
@@ -53,7 +52,6 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// Stripe — création session paiement
 app.post("/api/create-checkout-session", async (req, res) => {
   const { email, interval = "month", trialDays = 4 } = req.body;
   if (!email) return res.status(400).json({ error: "email est requis" });
@@ -84,7 +82,6 @@ app.post("/api/create-checkout-session", async (req, res) => {
   }
 });
 
-// The Odds API — matchs en temps réel
 app.get("/api/odds/:sport", async (req, res) => {
   const { sport } = req.params;
   const SPORT_KEYS = {
