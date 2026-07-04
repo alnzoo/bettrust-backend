@@ -10,7 +10,6 @@ app.use(cors({
     "https://bettrust.fr",
     "https://www.bettrust.fr",
     "https://bettrust-app.netlify.app",
-    "https://prono-betwise.netlify.app",
     "http://localhost:3000",
     "http://localhost:5173",
   ],
@@ -20,8 +19,8 @@ app.use(cors({
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const ODDS_API_KEY      = process.env.ODDS_API_KEY;
-const PORT              = process.env.PORT || 3001;
+const ODDS_API_KEY = process.env.ODDS_API_KEY;
+const PORT = process.env.PORT || 3001;
 
 app.get("/", (req, res) => {
   res.json({ status: "BetTrust API OK", version: "1.0.0" });
@@ -56,7 +55,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
   if (!email) return res.status(400).json({ error: "email est requis" });
   const PRICE_IDS = {
     month: "price_1TpF3nAxeR2E4XmUzFMC7iEQ",
-    year:  "price_1TpKCPAxeR2E4XmUvXoChDm0",
+    year: "price_1TpKCPAxeR2E4XmUvXoChDm0",
   };
   const priceId = PRICE_IDS[interval] || PRICE_IDS.month;
   try {
@@ -72,7 +71,7 @@ app.post("/api/create-checkout-session", async (req, res) => {
       mode: "subscription",
       subscription_data: { trial_period_days: trialDays },
       success_url: "https://bettrust.fr?payment=success",
-      cancel_url:  "https://bettrust.fr?payment=cancelled",
+      cancel_url: "https://bettrust.fr?payment=cancelled",
     });
     res.json({ ok: true, url: session.url });
   } catch (err) {
@@ -85,18 +84,24 @@ app.get("/api/odds/:sport", async (req, res) => {
   const { sport } = req.params;
   const SPORT_KEYS = {
     tennis: [
-      "tennis_atp_wimbledon","tennis_wta_wimbledon",
-      "tennis_atp_french_open","tennis_wta_french_open",
-      "tennis_atp_us_open","tennis_wta_us_open",
-      "tennis_atp_australian_open","tennis_wta_australian_open",
+      "tennis_atp_wimbledon", "tennis_wta_wimbledon",
+      "tennis_atp_french_open", "tennis_wta_french_open",
+      "tennis_atp_us_open", "tennis_wta_us_open",
+      "tennis_atp_australian_open", "tennis_wta_australian_open",
     ],
     football: [
-      "soccer_france_ligue_one","soccer_france_ligue_two",
-      "soccer_spain_la_liga","soccer_epl",
-      "soccer_germany_bundesliga","soccer_italy_serie_a",
-      "soccer_portugal_primeira_liga","soccer_netherlands_eredivisie",
-      "soccer_belgium_first_div","soccer_uefa_champs_league",
+      "soccer_fifa_world_cup",
+      "soccer_uefa_champs_league",
       "soccer_uefa_europa_league",
+      "soccer_france_ligue_one",
+      "soccer_spain_la_liga",
+      "soccer_epl",
+      "soccer_germany_bundesliga",
+      "soccer_italy_serie_a",
+      "soccer_portugal_primeira_liga",
+      "soccer_netherlands_eredivisie",
+      "soccer_belgium_first_div",
+      "soccer_france_ligue_two",
     ],
   };
   const keys = SPORT_KEYS[sport];
